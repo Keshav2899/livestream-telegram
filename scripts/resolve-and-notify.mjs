@@ -45,10 +45,38 @@ function istStamp() {
   });
 }
 
+function getIstMinutesNow() {
+  const parts = new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'Asia/Kolkata',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  }).formatToParts(new Date());
+
+  const hh = Number(parts.find((p) => p.type === 'hour')?.value ?? '0');
+  const mm = Number(parts.find((p) => p.type === 'minute')?.value ?? '0');
+  return hh * 60 + mm;
+}
+
+function isWithinLivestreamWindowIst() {
+  // 06:30 IST to 08:30 IST inclusive
+  const now = getIstMinutesNow();
+  const start = 6 * 60 + 30;
+  const end = 8 * 60 + 30;
+  return now >= start && now <= end;
+}
+
 async function main() {
   if (!TELEGRAM_BOT_TOKEN || !TELEGRAM_CHAT_ID) {
     console.error('Set TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID');
     process.exit(1);
+  }
+
+  if (!isWithinLivestreamWindowIst()) {
+    const msg = `No active livestream now (${istStamp()} IST)\nOutside 06:30-08:30 IST window, skipping.`;
+    await sendTelegram(msg);
+    console.log(msg);
+    return;
   }
 
   const browser = await chromium.launch({ headless: true });
