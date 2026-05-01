@@ -1,5 +1,8 @@
 name: Daily livestream URL to Telegram
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 on:
   schedule:
     # 07:00 Asia/Kolkata (IST) == 01:30 UTC
@@ -18,8 +21,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
-          cache: npm
+          node-version: '22'
 
       - name: Install dependencies
         run: npm install --no-audit --no-fund
