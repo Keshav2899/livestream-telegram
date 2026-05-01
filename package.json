@@ -1,0 +1,15 @@
+{
+  "name": "livestream-telegram",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "resolve": "node scripts/resolve-and-notify.mjs"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "playwright": "^1.49.1"
+  }
+}
