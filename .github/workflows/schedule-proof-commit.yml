@@ -1,4 +1,4 @@
-name: Schedule proof commit (7:48 IST)
+name: Schedule proof commit (7:53 IST)
 
 # Commits a timestamp file so you can verify scheduled Actions in git history.
 permissions:
@@ -6,8 +6,8 @@ permissions:
 
 'on':
   schedule:
-    # 07:48 Asia/Kolkata (IST) == 02:18 UTC
-    - cron: '18 2 * * *'
+    # 07:53 Asia/Kolkata (IST) == 02:23 UTC
+    - cron: '23 2 * * *'
   workflow_dispatch:
 
 jobs:
