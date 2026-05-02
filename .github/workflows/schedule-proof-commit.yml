@@ -1,0 +1,32 @@
+name: Schedule proof commit (7:48 IST)
+
+# Commits a timestamp file so you can verify scheduled Actions in git history.
+permissions:
+  contents: write
+
+'on':
+  schedule:
+    # 07:48 Asia/Kolkata (IST) == 02:18 UTC
+    - cron: '18 2 * * *'
+  workflow_dispatch:
+
+jobs:
+  commit-proof:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Write proof file and push
+        run: |
+          mkdir -p .github
+          printf '%s event=%s ref=%s\n' "$(date -u +'%Y-%m-%d %H:%M:%S UTC')" "${{ github.event_name }}" "${{ github.ref }}" > .github/schedule-proof.txt
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add .github/schedule-proof.txt
+          if git diff --staged --quiet; then
+            echo "No changes to commit"
+            exit 0
+          fi
+          git commit -m "chore: schedule proof $(date -u +'%Y-%m-%dT%H:%M:%SZ')"
+          git push

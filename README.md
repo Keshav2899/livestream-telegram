@@ -1,6 +1,6 @@
 # Daily livestream → YouTube URL on Telegram
 
-At **07:00 IST** each day, a GitHub Actions workflow opens the Times Health Plus livestream page in headless Chromium, waits for the JavaScript redirect to YouTube, and sends the final URL to you on **Telegram**.
+At **07:48 IST** each day, a GitHub Actions workflow opens the Times Health Plus livestream page in headless Chromium, waits for the JavaScript redirect to YouTube, and sends the final URL to you on **Telegram**. (Time is set to **07:48 IST** temporarily so you can confirm scheduling works; change the cron in the workflow when you want a different time.)
 
 ## Setup
 
@@ -27,14 +27,13 @@ Push this repo to GitHub. Confirm **Actions** are allowed and the default branch
 
 In GitHub: **Actions → Daily livestream URL to Telegram → Run workflow**.
 
-### Scheduled run (7:00 IST) not firing
+### Scheduled run (7:48 IST) not firing
 
 1. Repo **Settings → Actions → General**: Actions must be **enabled** (not “Disable actions”).
-2. **Settings → Actions → General → Workflow permissions**: choose **Read and write permissions** *or* keep read-only; this repo only needs **read** for `checkout`, but restrictive org defaults can sometimes interfere—if schedules never appear, try read/write once.
+2. **Settings → Actions → General → Workflow permissions**: the **Schedule proof commit** workflow must be able to **push** commits. Use **Read and write permissions** (or fine-grained token settings that allow `contents: write`). If pushes are blocked, the proof workflow will fail on `git push`.
 3. Confirm the workflow files exist on the **default branch** (`main`).
-4. GitHub can **delay or drop** scheduled runs during high load; the cron is set to **01:30 UTC** (07:00 IST), not on the top of the hour, to reduce collisions.
-5. A tiny workflow **Schedule heartbeat (GitHub cron check)** runs daily at **06:52 IST** (`01:22 UTC`). Open **Actions** and verify you see a **`schedule`** run for it.  
-   - If the heartbeat never shows `schedule` runs, the problem is GitHub-side scheduling/settings (not Playwright). You can delete `schedule-heartbeat.yml` after debugging.
+4. GitHub can **delay or drop** scheduled runs during high load.
+5. **Schedule proof commit (7:48 IST)** runs at the same wall time and updates `.github/schedule-proof.txt`. Check **Commits** on `main` for `chore: schedule proof ...` — if those commits appear daily, the scheduler is working.
 
 ## Local run
 
@@ -52,6 +51,6 @@ npm run resolve
 
 ## Notes
 
-- Scheduled workflows use **UTC**; `30 1 * * *` is **07:00 IST**.
+- Scheduled workflows use **UTC**; `18 2 * * *` is **07:48 IST** (02:18 UTC + 5:30).
 - If the site blocks datacenter IPs, the job may fail; try a VPS with the same script.
 - On failure, a `failure.png` screenshot is uploaded as a workflow artifact when possible.
