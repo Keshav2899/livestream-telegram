@@ -27,12 +27,21 @@ Push this repo to GitHub. Confirm **Actions** are allowed and the default branch
 
 In GitHub: **Actions → Daily livestream URL to Telegram → Run workflow**.
 
+### Scheduled run (7:00 IST) not firing
+
+1. Repo **Settings → Actions → General**: Actions must be **enabled** (not “Disable actions”).
+2. **Settings → Actions → General → Workflow permissions**: choose **Read and write permissions** *or* keep read-only; this repo only needs **read** for `checkout`, but restrictive org defaults can sometimes interfere—if schedules never appear, try read/write once.
+3. Confirm the workflow files exist on the **default branch** (`main`).
+4. GitHub can **delay or drop** scheduled runs during high load; the cron is set to **01:30 UTC** (07:00 IST), not on the top of the hour, to reduce collisions.
+5. A tiny workflow **Schedule heartbeat (GitHub cron check)** runs daily at **06:52 IST** (`01:22 UTC`). Open **Actions** and verify you see a **`schedule`** run for it.  
+   - If the heartbeat never shows `schedule` runs, the problem is GitHub-side scheduling/settings (not Playwright). You can delete `schedule-heartbeat.yml` after debugging.
+
 ## Local run
 
 Requires Node 20+.
 
 ```bash
-npm ci
+npm install
 npx playwright install chromium
 set TELEGRAM_BOT_TOKEN=...
 set TELEGRAM_CHAT_ID=...

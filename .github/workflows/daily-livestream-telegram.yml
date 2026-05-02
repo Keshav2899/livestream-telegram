@@ -1,13 +1,17 @@
 name: Daily livestream URL to Telegram
 
-env:
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+# Explicit permissions help scheduled runs on repos with restrictive defaults.
+permissions:
+  contents: read
 
-on:
+'on':
+  workflow_dispatch:
   schedule:
     # 07:00 Asia/Kolkata (IST) == 01:30 UTC
     - cron: '30 1 * * *'
-  workflow_dispatch:
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
   resolve:
@@ -15,6 +19,12 @@ jobs:
     timeout-minutes: 15
 
     steps:
+      - name: Show trigger (schedule vs manual)
+        run: |
+          echo "github.event_name=${{ github.event_name }}"
+          echo "github.ref=${{ github.ref }}"
+          echo "github.sha=${{ github.sha }}"
+
       - name: Checkout
         uses: actions/checkout@v4
 
