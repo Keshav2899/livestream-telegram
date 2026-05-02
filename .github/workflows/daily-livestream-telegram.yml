@@ -7,8 +7,8 @@ permissions:
 'on':
   workflow_dispatch:
   schedule:
-    # 07:53 Asia/Kolkata (IST) == 02:23 UTC
-    - cron: '23 2 * * *'
+    # 07:59 Asia/Kolkata (IST) == 02:29 UTC
+    - cron: '29 2 * * *'
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
