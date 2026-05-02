@@ -1,4 +1,6 @@
 import { chromium } from 'playwright';
+import { readFile, writeFile } from 'node:fs/promises';
+import { existsSync } from 'node:fs';
 
 const START_URL =
   process.env.START_URL ||
@@ -6,6 +8,12 @@ const START_URL =
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID;
 const TIMEOUT_MS = Number.parseInt(process.env.TIMEOUT_MS || '90000', 10);
+const STATE_FILE = process.env.STATE_FILE || 'livestream-state.json';
+const GITHUB_EVENT_NAME = process.env.GITHUB_EVENT_NAME || '';
+
+/** 05:00–09:59 IST (live window you asked for) */
+const WINDOW_START_MIN = 5 * 60;
+const WINDOW_END_MIN = 9 * 60 + 59;
 
 function isYoutubeHost(hostname) {
   const h = hostname.replace(/^www\./, '').toLowerCase();
@@ -45,6 +53,19 @@ function istStamp() {
   });
 }
 
+function getIstDateYmd() {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Kolkata',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(new Date());
+  const y = parts.find((p) => p.type === 'year')?.value;
+  const m = parts.find((p) => p.type === 'month')?.value;
+  const d = parts.find((p) => p.type === 'day')?.value;
+  return `${y}-${m}-${d}`;
+}
+
 function getIstMinutesNow() {
   const parts = new Intl.DateTimeFormat('en-GB', {
     timeZone: 'Asia/Kolkata',
@@ -59,11 +80,22 @@ function getIstMinutesNow() {
 }
 
 function isWithinLivestreamWindowIst() {
-  // 06:30 IST to 08:30 IST inclusive
   const now = getIstMinutesNow();
-  const start = 6 * 60 + 30;
-  const end = 8 * 60 + 30;
-  return now >= start && now <= end;
+  return now >= WINDOW_START_MIN && now <= WINDOW_END_MIN;
+}
+
+async function loadState() {
+  if (!existsSync(STATE_FILE)) return null;
+  try {
+    const raw = await readFile(STATE_FILE, 'utf8');
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
+}
+
+async function saveState(obj) {
+  await writeFile(STATE_FILE, JSON.stringify(obj, null, 2), 'utf8');
 }
 
 async function main() {
@@ -72,10 +104,31 @@ async function main() {
     process.exit(1);
   }
 
+  const todayIst = getIstDateYmd();
+
   if (!isWithinLivestreamWindowIst()) {
-    const msg = `No active livestream now (${istStamp()} IST)\nOutside 06:30-08:30 IST window, skipping.`;
+    // Scheduled runs that GitHub starts late would spam "outside window" — stay quiet.
+    if (GITHUB_EVENT_NAME === 'schedule') {
+      console.log(
+        `Outside 05:00–09:59 IST (${istStamp()}), exit 0 (no Telegram for schedule).`
+      );
+      return;
+    }
+    const msg = `No active livestream now (${istStamp()} IST)\nOutside 05:00–09:59 IST window, skipping.`;
     await sendTelegram(msg);
     console.log(msg);
+    return;
+  }
+
+  const state = await loadState();
+  if (
+    state?.successUrl &&
+    state?.date === todayIst &&
+    isYoutubeUrl(state.successUrl)
+  ) {
+    console.log(
+      `Already notified today (${todayIst}) with URL; skipping duplicate Telegram.`
+    );
     return;
   }
 
@@ -96,10 +149,9 @@ async function main() {
     });
     lastUrl = page.url();
 
-    await page.waitForURL(
-      (url) => isYoutubeHost(url.hostname),
-      { timeout: TIMEOUT_MS }
-    );
+    await page.waitForURL((url) => isYoutubeHost(url.hostname), {
+      timeout: TIMEOUT_MS,
+    });
     finalUrl = page.url();
     lastUrl = finalUrl;
   } catch (e) {
@@ -121,9 +173,26 @@ async function main() {
   const stamp = istStamp();
 
   if (finalUrl && isYoutubeUrl(finalUrl)) {
+    if (state?.successUrl === finalUrl && state?.date === todayIst) {
+      console.log('Same URL as cached state; skip Telegram.');
+      return;
+    }
     await sendTelegram(`Live stream (${stamp} IST)\n${finalUrl}`);
     console.log('Notified Telegram:', finalUrl);
+    await saveState({
+      date: todayIst,
+      successUrl: finalUrl,
+      failureNotifiedDate: null,
+    });
     return;
+  }
+
+  const failDay = state?.failureNotifiedDate;
+  if (failDay === todayIst) {
+    console.log(
+      `Failure already reported for ${todayIst}; not sending again (see earlier Telegram).`
+    );
+    process.exit(0);
   }
 
   const lines = [
@@ -133,6 +202,11 @@ async function main() {
   ];
   await sendTelegram(lines.join('\n'));
   console.error(lines.join('\n'));
+  await saveState({
+    date: todayIst,
+    successUrl: state?.successUrl ?? null,
+    failureNotifiedDate: todayIst,
+  });
   process.exit(1);
 }
 

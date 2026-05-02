@@ -1,4 +1,5 @@
 node_modules/
+livestream-state.json
 failure.png
 playwright-report/
 test-results/

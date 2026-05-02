@@ -7,8 +7,16 @@ permissions:
 'on':
   workflow_dispatch:
   schedule:
-    # 07:59 Asia/Kolkata (IST) == 02:29 UTC
-    - cron: '29 2 * * *'
+    # Multiple UTC slots ≈ 5:00–9:50 IST to survive GitHub schedule jitter (free tier).
+    # IST = UTC+5:30
+    - cron: '30 23 * * *' # ~05:00 IST
+    - cron: '15 0 * * *' # ~05:45 IST
+    - cron: '0 1 * * *' # ~06:30 IST
+    - cron: '45 1 * * *' # ~07:15 IST
+    - cron: '30 2 * * *' # ~08:00 IST
+    - cron: '15 3 * * *' # ~08:45 IST
+    - cron: '0 4 * * *' # ~09:30 IST
+    - cron: '20 4 * * *' # ~09:50 IST
 
 jobs:
   resolve:
@@ -24,6 +32,16 @@ jobs:
 
       - name: Checkout
         uses: actions/checkout@v6
+
+      - name: IST calendar date (cache key)
+        id: istday
+        run: echo "d=$(TZ=Asia/Kolkata date +%Y-%m-%d)" >> "$GITHUB_OUTPUT"
+
+      - name: Restore same-day notify state
+        uses: actions/cache@v4
+        with:
+          path: livestream-state.json
+          key: livestream-notify-${{ steps.istday.outputs.d }}
 
       - name: Setup Node.js
         uses: actions/setup-node@v6
@@ -42,6 +60,8 @@ jobs:
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           START_URL: https://timeshealthplus.com/TH/livestream/KeshavKeshav21842
           TIMEOUT_MS: '90000'
+          STATE_FILE: ${{ github.workspace }}/livestream-state.json
+          GITHUB_EVENT_NAME: ${{ github.event_name }}
         run: npm run resolve
 
       - name: Upload failure screenshot
