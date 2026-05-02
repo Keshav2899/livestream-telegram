@@ -37,7 +37,7 @@ In GitHub: **Actions → Daily livestream URL to Telegram → Run workflow**.
 
 ## Local run
 
-Requires Node 20+.
+Requires Node 20+ locally; GitHub Actions uses Node **24** with current workflow actions.
 
 ```bash
 npm install

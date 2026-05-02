@@ -4,9 +4,6 @@ name: Schedule proof commit (7:59 IST)
 permissions:
   contents: write
 
-env:
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
-
 'on':
   schedule:
     # 07:59 Asia/Kolkata (IST) == 02:29 UTC
@@ -18,7 +15,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Write proof file and push
         run: |

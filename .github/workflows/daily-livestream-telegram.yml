@@ -10,9 +10,6 @@ permissions:
     # 07:59 Asia/Kolkata (IST) == 02:29 UTC
     - cron: '29 2 * * *'
 
-env:
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
-
 jobs:
   resolve:
     runs-on: ubuntu-latest
@@ -26,12 +23,12 @@ jobs:
           echo "github.sha=${{ github.sha }}"
 
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
-          node-version: '22'
+          node-version: '24'
 
       - name: Install dependencies
         run: npm install --no-audit --no-fund
@@ -49,7 +46,7 @@ jobs:
 
       - name: Upload failure screenshot
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: failure-screenshot
           path: failure.png
