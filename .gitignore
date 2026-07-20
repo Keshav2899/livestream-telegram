@@ -1,7 +1,8 @@
+service-account-key.json
 node_modules/
+.DS_Store
+*.log
+.env
+.env.local
 livestream-state.json
 failure.png
-playwright-report/
-test-results/
-.env
-*.log

@@ -1,4 +1,4 @@
-name: Daily livestream URL to Telegram
+name: Daily livestream URL to Firebase
 
 # Explicit permissions help scheduled runs on repos with restrictive defaults.
 permissions:
@@ -24,11 +24,11 @@ jobs:
     timeout-minutes: 15
 
     steps:
-      - name: Show trigger (schedule vs manual)
+      - name: Show trigger info
         run: |
-          echo "github.event_name=${{ github.event_name }}"
-          echo "github.ref=${{ github.ref }}"
-          echo "github.sha=${{ github.sha }}"
+          echo "Trigger: ${{ github.event_name }}"
+          echo "Ref: ${{ github.ref }}"
+          echo "SHA: ${{ github.sha }}"
 
       - name: Checkout
         uses: actions/checkout@v6
@@ -37,7 +37,7 @@ jobs:
         id: istday
         run: echo "d=$(TZ=Asia/Kolkata date +%Y-%m-%d)" >> "$GITHUB_OUTPUT"
 
-      - name: Restore same-day notify state
+      - name: Restore same-day state
         uses: actions/cache@v4
         with:
           path: livestream-state.json
@@ -49,25 +49,22 @@ jobs:
           node-version: '24'
 
       - name: Install dependencies
-        run: npm install --no-audit --no-fund
+        run: npm install
 
-      - name: Install Playwright Chromium
-        run: npx playwright install --with-deps chromium
+      - name: Setup Firebase credentials
+        run: echo "${{ secrets.FIREBASE_SERVICE_ACCOUNT }}" > service-account-key.json
 
-      - name: Resolve URL and notify Telegram
+      - name: Run livestream detector
+        run: npm run resolve
         env:
+          START_URL: ${{ secrets.START_URL }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-          START_URL: https://timeshealthplus.com/TH/livestream/KeshavKeshav21842
-          TIMEOUT_MS: '90000'
-          STATE_FILE: ${{ github.workspace }}/livestream-state.json
           GITHUB_EVENT_NAME: ${{ github.event_name }}
-        run: npm run resolve
 
-      - name: Upload failure screenshot
-        if: failure()
-        uses: actions/upload-artifact@v7
+      - name: Cache state for later runs
+        uses: actions/cache@v4
+        if: always()
         with:
-          name: failure-screenshot
-          path: failure.png
-          if-no-files-found: ignore
+          path: livestream-state.json
+          key: livestream-notify-${{ steps.istday.outputs.d }}

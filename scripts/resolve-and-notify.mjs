@@ -1,6 +1,7 @@
 import { chromium } from 'playwright';
 import { readFile, writeFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
+import admin from 'firebase-admin';
 
 const START_URL =
   process.env.START_URL ||
@@ -11,7 +12,105 @@ const TIMEOUT_MS = Number.parseInt(process.env.TIMEOUT_MS || '90000', 10);
 const STATE_FILE = process.env.STATE_FILE || 'livestream-state.json';
 const GITHUB_EVENT_NAME = process.env.GITHUB_EVENT_NAME || '';
 
-/** 05:00–09:59 IST (live window you asked for) */
+// Firebase setup
+let firestore = null;
+let firebaseInitialized = false;
+
+/**
+ * Initialize Firebase Admin SDK
+ * Reads service account key from environment variable or file
+ */
+async function initializeFirebase() {
+  if (firebaseInitialized) return;
+
+  try {
+    if (existsSync('service-account-key.json')) {
+      const serviceAccount = JSON.parse(
+        await readFile('service-account-key.json', 'utf8')
+      );
+
+      admin.initializeApp({
+        credential: admin.credential.cert(serviceAccount),
+      });
+
+      firestore = admin.firestore();
+      firebaseInitialized = true;
+      console.log('✓ Firebase initialized successfully');
+    } else {
+      console.error('✗ Error: service-account-key.json not found!');
+      console.error('Please create service account key from Firebase Console');
+      process.exit(1);
+    }
+  } catch (e) {
+    console.error('✗ Firebase initialization failed:', e.message);
+    process.exit(1);
+  }
+}
+
+/**
+ * Save YouTube URL to Firebase Firestore
+ */
+async function saveToFirebase(youtubeUrl, title = 'YouTube Livestream') {
+  if (!firestore) {
+    throw new Error('Firebase not initialized');
+  }
+
+  try {
+    const dateStr = getIstDateYmd(); // Gets date in YYYY-MM-DD format
+
+    const docRef = await firestore.collection('youtube_urls').add({
+      url: youtubeUrl,
+      title,
+      notes: `Captured from livestream at ${istStamp()}`,
+      timestamp: Date.now(),
+      date: dateStr  // Add date field for day-wise organization
+    });
+
+    console.log('✓ Saved to Firebase:');
+    console.log(`  URL: ${youtubeUrl}`);
+    console.log(`  Date: ${dateStr}`);
+    console.log(`  Document ID: ${docRef.id}`);
+
+    return docRef.id;
+  } catch (e) {
+    console.error('✗ Failed to save to Firebase:', e.message);
+    throw e;
+  }
+}
+
+/**
+ * Send message to Telegram (optional notification)
+ */
+async function sendTelegram(text) {
+  if (!TELEGRAM_BOT_TOKEN || !TELEGRAM_CHAT_ID) {
+    console.log('ℹ Telegram not configured (skipping notification)');
+    return;
+  }
+
+  const url = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`;
+  const body = new URLSearchParams({
+    chat_id: String(TELEGRAM_CHAT_ID),
+    text,
+  });
+
+  try {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: body.toString(),
+    });
+    if (!res.ok) {
+      const detail = await res.text();
+      throw new Error(`Telegram API ${res.status}: ${detail}`);
+    }
+    console.log('✓ Telegram notification sent');
+  } catch (e) {
+    console.error('⚠ Telegram notification failed:', e.message);
+    // Don't fail the job if Telegram fails
+  }
+}
+
+/** 05:00–09:59 IST (live window) */
 const WINDOW_START_MIN = 5 * 60;
 const WINDOW_END_MIN = 9 * 60 + 59;
 
@@ -25,23 +124,6 @@ function isYoutubeUrl(urlString) {
     return isYoutubeHost(new URL(urlString).hostname);
   } catch {
     return false;
-  }
-}
-
-async function sendTelegram(text) {
-  const url = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`;
-  const body = new URLSearchParams({
-    chat_id: String(TELEGRAM_CHAT_ID),
-    text,
-  });
-  const res = await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: body.toString(),
-  });
-  if (!res.ok) {
-    const detail = await res.text();
-    throw new Error(`Telegram API ${res.status}: ${detail}`);
   }
 }
 
@@ -99,26 +181,26 @@ async function saveState(obj) {
 }
 
 async function main() {
-  if (!TELEGRAM_BOT_TOKEN || !TELEGRAM_CHAT_ID) {
-    console.error('Set TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID');
-    process.exit(1);
-  }
+  console.log('\n========================================');
+  console.log('Livestream URL Detector with Firebase');
+  console.log('========================================\n');
 
-  const todayIst = getIstDateYmd();
+  // Initialize Firebase FIRST
+  await initializeFirebase();
 
   if (!isWithinLivestreamWindowIst()) {
-    // Scheduled runs that GitHub starts late would spam "outside window" — stay quiet.
     if (GITHUB_EVENT_NAME === 'schedule') {
-      console.log(
-        `Outside 05:00–09:59 IST (${istStamp()}), exit 0 (no Telegram for schedule).`
-      );
+      console.log(`ℹ Outside 05:00–09:59 IST (${istStamp()}), exiting silently.`);
       return;
     }
     const msg = `No active livestream now (${istStamp()} IST)\nOutside 05:00–09:59 IST window, skipping.`;
-    await sendTelegram(msg);
     console.log(msg);
+    await sendTelegram(msg);
     return;
   }
+
+  const todayIst = getIstDateYmd();
+  console.log(`Today's date (IST): ${todayIst}`);
 
   const state = await loadState();
   if (
@@ -127,7 +209,7 @@ async function main() {
     isYoutubeUrl(state.successUrl)
   ) {
     console.log(
-      `Already notified today (${todayIst}) with URL; skipping duplicate Telegram.`
+      `✓ Already notified today (${todayIst}) with URL; skipping duplicate.`
     );
     return;
   }
@@ -143,17 +225,21 @@ async function main() {
   let errMessage = null;
 
   try {
+    console.log(`\n📡 Navigating to: ${START_URL}`);
     await page.goto(START_URL, {
       waitUntil: 'domcontentloaded',
       timeout: 60000,
     });
     lastUrl = page.url();
+    console.log(`   Current URL: ${lastUrl}`);
 
+    console.log(`\n⏳ Waiting for YouTube redirect (${TIMEOUT_MS}ms timeout)...`);
     await page.waitForURL((url) => isYoutubeHost(url.hostname), {
       timeout: TIMEOUT_MS,
     });
     finalUrl = page.url();
     lastUrl = finalUrl;
+    console.log(`   ✓ Redirected to YouTube!`);
   } catch (e) {
     errMessage = e instanceof Error ? e.message : String(e);
     try {
@@ -163,6 +249,7 @@ async function main() {
     }
     try {
       await page.screenshot({ path: 'failure.png', fullPage: false });
+      console.log('📸 Screenshot saved: failure.png');
     } catch {
       /* ignore */
     }
@@ -174,52 +261,73 @@ async function main() {
 
   if (finalUrl && isYoutubeUrl(finalUrl)) {
     if (state?.successUrl === finalUrl && state?.date === todayIst) {
-      console.log('Same URL as cached state; skip Telegram.');
+      console.log('ℹ Same URL as cached state; skipping.');
       return;
     }
-    await sendTelegram(`Live stream (${stamp} IST)\n${finalUrl}`);
-    console.log('Notified Telegram:', finalUrl);
+
+    console.log(`\n✓ SUCCESS! YouTube URL found!`);
+    console.log(`  URL: ${finalUrl}`);
+    console.log(`  Time: ${stamp}`);
+
+    // SAVE TO FIREBASE (primary action)
+    try {
+      await saveToFirebase(finalUrl, `Livestream - ${todayIst}`);
+    } catch (e) {
+      console.error('✗ CRITICAL: Failed to save to Firebase!');
+      throw e;
+    }
+
+    // Send Telegram notification (optional, bonus)
+    await sendTelegram(`✓ Live stream captured!\n${stamp}\n\n${finalUrl}`);
+
+    // Save state
     await saveState({
       date: todayIst,
       successUrl: finalUrl,
       failureNotifiedDate: null,
     });
+
+    console.log('\n✓ Operation complete!');
     return;
   }
 
   const failDay = state?.failureNotifiedDate;
   if (failDay === todayIst) {
     console.log(
-      `Failure already reported for ${todayIst}; not sending again (see earlier Telegram).`
+      `ℹ Failure already reported for ${todayIst}; not sending again.`
     );
     process.exit(0);
   }
 
+  console.log(`\n✗ ERROR: Could not resolve YouTube URL`);
   const lines = [
     `Could not resolve YouTube URL (${stamp} IST)`,
     errMessage || 'Unknown error',
     `Last URL: ${lastUrl}`,
   ];
-  await sendTelegram(lines.join('\n'));
-  console.error(lines.join('\n'));
+
+  const errorMsg = lines.join('\n');
+  console.error(errorMsg);
+
+  await sendTelegram(errorMsg);
   await saveState({
     date: todayIst,
     successUrl: state?.successUrl ?? null,
     failureNotifiedDate: todayIst,
   });
+
   process.exit(1);
 }
 
 main().catch(async (e) => {
-  console.error(e);
-  if (TELEGRAM_BOT_TOKEN && TELEGRAM_CHAT_ID) {
-    try {
-      await sendTelegram(
-        `Livestream job crashed (${istStamp()} IST)\n${e instanceof Error ? e.message : String(e)}`
-      );
-    } catch {
-      /* ignore */
-    }
+  console.error('\n✗ Job crashed:', e);
+  const stamp = istStamp();
+  const msg = `✗ Livestream job crashed (${stamp} IST)\n${e instanceof Error ? e.message : String(e)}`;
+
+  try {
+    await sendTelegram(msg);
+  } catch {
+    /* ignore */
   }
   process.exit(1);
 });
