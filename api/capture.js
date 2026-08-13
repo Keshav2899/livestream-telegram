@@ -35,22 +35,31 @@ export default async function handler(req, res) {
 
     console.log('✓ Firebase initialized');
     console.log('📺 Launching browser to capture URL from:', START_URL);
+    console.log('Current directory:', process.cwd());
 
-    // Ensure Playwright chromium is installed
+    // Ensure Playwright chromium is installed (in /tmp or /home for Vercel)
+    const browserInstallCmd = 'npx playwright install --with-deps chromium';
     try {
-      execSync('npx playwright install chromium', {
-        stdio: 'inherit',
-        timeout: 60000,
+      console.log('Installing Playwright chromium...');
+      execSync(browserInstallCmd, {
+        timeout: 120000,
+        env: { ...process.env, PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: 'false' },
       });
       console.log('✓ Playwright chromium installed');
     } catch (e) {
-      console.log('⚠ Playwright install failed, attempting launch anyway:', e.message);
+      console.log('⚠ Install warning (may still work):', e.message);
     }
 
-    // Launch browser and capture URL
+    // Launch browser with proper configuration for Vercel
     const browser = await chromium.launch({
       headless: true,
-      args: ['--disable-gpu', '--no-first-run', '--no-sandbox'],
+      args: [
+        '--no-sandbox',
+        '--disable-setuid-sandbox',
+        '--disable-gpu',
+        '--disable-dev-shm-usage', // Important for serverless
+        '--single-process', // Help with Vercel limitations
+      ],
     });
     const page = await browser.newPage();
 
