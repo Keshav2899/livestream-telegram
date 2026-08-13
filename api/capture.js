@@ -9,10 +9,16 @@ export default async function handler(req, res) {
   try {
     console.log('📺 Starting livestream URL capture...');
 
+    // Debug: Log all env vars
+    const envKeys = Object.keys(process.env).filter(k => k.includes('FIREBASE') || k.includes('START') || k.includes('TELEGRAM'));
+    console.log('Available env vars:', envKeys);
+    console.log('FIREBASE_SERVICE_ACCOUNT exists:', !!process.env.FIREBASE_SERVICE_ACCOUNT);
+    console.log('START_URL exists:', !!process.env.START_URL);
+
     // Write Firebase service account from environment variable
     const firebaseServiceAccount = process.env.FIREBASE_SERVICE_ACCOUNT;
     if (!firebaseServiceAccount) {
-      throw new Error('FIREBASE_SERVICE_ACCOUNT environment variable not set');
+      throw new Error('FIREBASE_SERVICE_ACCOUNT environment variable not set. Available vars: ' + envKeys.join(', '));
     }
 
     writeFileSync(serviceAccountPath, firebaseServiceAccount);
