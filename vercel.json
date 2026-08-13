@@ -1,11 +1,11 @@
 {
   "version": 2,
-  "buildCommand": "npm install && npx playwright install chromium",
-  "outputDirectory": ".",
+  "buildCommand": "npm install && npx playwright install chromium && echo 'Build complete'",
   "functions": {
     "api/capture.js": {
       "memory": 1024,
       "maxDuration": 120
     }
-  }
+  },
+  "ignoreCommand": "git check-ignore"
 }
