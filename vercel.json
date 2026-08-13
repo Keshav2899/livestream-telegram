@@ -1,6 +1,7 @@
 {
   "version": 2,
   "buildCommand": "npm install && npx playwright install chromium",
+  "outputDirectory": ".",
   "functions": {
     "api/capture.js": {
       "memory": 1024,
