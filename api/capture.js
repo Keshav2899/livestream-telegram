@@ -45,16 +45,19 @@ export default async function handler(req, res) {
     });
   } catch (error) {
     console.error('❌ Error:', error.message);
-    console.error('❌ Full Error:', error);
-    console.error('❌ Stderr:', error.stderr?.toString());
-    console.error('❌ Stdout:', error.stdout?.toString());
+    console.error('❌ Full error:', error.toString());
 
-    res.status(500).json({
+    const errorDetails = {
       success: false,
       error: error.message,
-      stderr: error.stderr?.toString(),
-      stdout: error.stdout?.toString(),
+      fullError: error.toString(),
+      stderr: error.stderr?.toString() || 'N/A',
+      stdout: error.stdout?.toString() || 'N/A',
       timestamp: new Date().toISOString(),
-    });
+    };
+
+    console.error('❌ Response:', JSON.stringify(errorDetails));
+
+    res.status(500).json(errorDetails);
   }
 }
