@@ -1,7 +1,8 @@
 // Vercel serverless function to capture daily livestream URL
-import { writeFileSync } from 'fs';
+import { writeFileSync, existsSync } from 'fs';
 import { chromium } from 'playwright';
 import admin from 'firebase-admin';
+import { execSync } from 'child_process';
 
 export default async function handler(req, res) {
   const tempDir = '/tmp';
@@ -35,8 +36,22 @@ export default async function handler(req, res) {
     console.log('✓ Firebase initialized');
     console.log('📺 Launching browser to capture URL from:', START_URL);
 
+    // Ensure Playwright chromium is installed
+    try {
+      execSync('npx playwright install chromium', {
+        stdio: 'inherit',
+        timeout: 60000,
+      });
+      console.log('✓ Playwright chromium installed');
+    } catch (e) {
+      console.log('⚠ Playwright install failed, attempting launch anyway:', e.message);
+    }
+
     // Launch browser and capture URL
-    const browser = await chromium.launch({ headless: true });
+    const browser = await chromium.launch({
+      headless: 'new',
+      args: ['--disable-gpu', '--no-first-run', '--no-sandbox'],
+    });
     const page = await browser.newPage();
 
     let youtubeUrl = null;
