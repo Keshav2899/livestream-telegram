@@ -23,6 +23,7 @@ export default async function handler(req, res) {
       cwd: process.cwd(),
       encoding: 'utf-8',
       timeout: 120000,
+      stdio: ['pipe', 'pipe', 'pipe'],
       env: {
         ...process.env,
         STATE_FILE: `${tempDir}/livestream-state.json`,
@@ -38,10 +39,15 @@ export default async function handler(req, res) {
     });
   } catch (error) {
     console.error('❌ Error:', error.message);
+    console.error('❌ Full Error:', error);
+    console.error('❌ Stderr:', error.stderr?.toString());
+    console.error('❌ Stdout:', error.stdout?.toString());
 
     res.status(500).json({
       success: false,
       error: error.message,
+      stderr: error.stderr?.toString(),
+      stdout: error.stdout?.toString(),
       timestamp: new Date().toISOString(),
     });
   }
