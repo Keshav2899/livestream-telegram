@@ -1,0 +1,10 @@
+{
+  "version": 2,
+  "functions": {
+    "api/capture.js": {
+      "runtime": "nodejs18.x",
+      "memory": 3008,
+      "maxDuration": 120
+    }
+  }
+}
