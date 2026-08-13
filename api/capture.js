@@ -49,7 +49,7 @@ export default async function handler(req, res) {
 
     // Launch browser and capture URL
     const browser = await chromium.launch({
-      headless: 'new',
+      headless: true,
       args: ['--disable-gpu', '--no-first-run', '--no-sandbox'],
     });
     const page = await browser.newPage();
