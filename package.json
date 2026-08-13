@@ -4,7 +4,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "resolve": "node scripts/resolve-and-notify.mjs"
+    "resolve": "node scripts/resolve-and-notify.mjs",
+    "postinstall": "playwright install chromium"
   },
   "engines": {
     "node": ">=20"
