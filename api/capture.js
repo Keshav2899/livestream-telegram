@@ -6,7 +6,7 @@ export default async function handler(req, res) {
     // Import and run the capture script
     const { execSync } = require('child_process');
 
-    const result = execSync('node resolve-and-notify-v2.mjs', {
+    const result = execSync('node scripts/resolve-and-notify.mjs', {
       cwd: process.cwd(),
       encoding: 'utf-8',
       timeout: 120000,
