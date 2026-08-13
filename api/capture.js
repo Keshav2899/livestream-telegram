@@ -1,15 +1,32 @@
 // Vercel serverless function to capture daily livestream URL
+import { execSync } from 'child_process';
+import { writeFileSync } from 'fs';
+
 export default async function handler(req, res) {
+  const tempDir = '/tmp';
+  const serviceAccountPath = `${tempDir}/service-account-key.json`;
+
   try {
     console.log('📺 Starting livestream URL capture...');
 
-    // Import and run the capture script
-    const { execSync } = require('child_process');
+    // Write Firebase service account from environment variable
+    const firebaseServiceAccount = process.env.FIREBASE_SERVICE_ACCOUNT;
+    if (!firebaseServiceAccount) {
+      throw new Error('FIREBASE_SERVICE_ACCOUNT environment variable not set');
+    }
 
+    writeFileSync(serviceAccountPath, firebaseServiceAccount);
+    console.log('✓ Firebase credentials written to temp file');
+
+    // Run the capture script with environment variable for temp path
     const result = execSync('node scripts/resolve-and-notify.mjs', {
       cwd: process.cwd(),
       encoding: 'utf-8',
       timeout: 120000,
+      env: {
+        ...process.env,
+        STATE_FILE: `${tempDir}/livestream-state.json`,
+      },
     });
 
     console.log('✅ Capture completed:', result);
