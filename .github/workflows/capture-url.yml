@@ -1,0 +1,45 @@
+name: Capture Livestream URL
+
+on:
+  schedule:
+    # 5:00 AM, 7:00 AM, 9:00 AM IST = 23:30, 01:30, 03:30 UTC (previous day)
+    - cron: '30 23 * * *'  # 5:00 AM IST
+    - cron: '30 01 * * *'  # 7:00 AM IST
+    - cron: '30 03 * * *'  # 9:00 AM IST
+  workflow_dispatch:
+
+jobs:
+  capture:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: npm install
+        timeout-minutes: 3
+
+      - name: Install Playwright
+        run: npx playwright install chromium
+        timeout-minutes: 2
+
+      - name: Capture livestream URL
+        run: timeout 120 node scripts/resolve-and-notify.mjs || true
+        env:
+          START_URL: ${{ secrets.START_URL }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          TIMEOUT_MS: '90000'
+          STATE_FILE: '/tmp/livestream-state.json'
+        timeout-minutes: 3
+
+      - name: Check status
+        if: always()
+        run: echo "Capture job completed"
