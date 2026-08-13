@@ -11,10 +11,13 @@ export default async function handler(req, res) {
     console.log('📺 Starting livestream URL capture...');
 
     // Write Firebase service account from environment variable
-    const firebaseServiceAccount = process.env.FIREBASE_SERVICE_ACCOUNT;
+    let firebaseServiceAccount = process.env.FIREBASE_SERVICE_ACCOUNT;
     if (!firebaseServiceAccount) {
       throw new Error('FIREBASE_SERVICE_ACCOUNT environment variable not set');
     }
+
+    // Remove BOM if present
+    firebaseServiceAccount = firebaseServiceAccount.replace(/^﻿/, '').trim();
 
     writeFileSync(serviceAccountPath, firebaseServiceAccount);
     const serviceAccount = JSON.parse(firebaseServiceAccount);
