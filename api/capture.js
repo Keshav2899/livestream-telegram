@@ -24,9 +24,9 @@ export default async function handler(req, res) {
     writeFileSync(serviceAccountPath, firebaseServiceAccount);
     console.log('✓ Firebase credentials written to temp file');
 
-    // Run the capture script from the root directory
-    const result = execSync('node scripts/resolve-and-notify.mjs', {
-      cwd: rootDir,
+    // Run the capture script from the api directory (same folder as this function)
+    const result = execSync('node resolve-and-notify.mjs', {
+      cwd: __dirname,
       encoding: 'utf-8',
       timeout: 120000,
       stdio: ['pipe', 'pipe', 'pipe'],
